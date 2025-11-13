@@ -1,0 +1,70 @@
+.lovense_settings {
+    padding: 10px;
+}
+
+.lovense_qr_container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    margin: 10px 0;
+}
+
+.lovense_qr_image {
+    max-width: 300px;
+    max-height: 300px;
+    margin: 10px 0;
+}
+
+.lovense_status {
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.lovense_status.connected {
+    background-color: rgba(0, 255, 0, 0.1);
+    border: 1px solid rgba(0, 255, 0, 0.3);
+}
+
+.lovense_status.disconnected {
+    background-color: rgba(255, 0, 0, 0.1);
+    border: 1px solid rgba(255, 0, 0, 0.3);
+}
+
+.lovense_toy_list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+}
+
+.lovense_toy_item {
+    padding: 8px;
+    margin: 5px 0;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.lovense_toy_name {
+    font-weight: bold;
+}
+
+.lovense_toy_battery {
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+#lovense_test_controls {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+    flex-wrap: wrap;
+}
+
+#lovense_test_controls button {
+    padding: 8px 16px;
+}

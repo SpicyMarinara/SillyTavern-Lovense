@@ -1,0 +1,145 @@
+<div class="inline-drawer">
+    <div class="inline-drawer-toggle inline-drawer-header">
+        <b>Lovense Control</b>
+        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+    </div>
+    <div class="inline-drawer-content">
+        <div class="flex-container flexFlowColumn wide100p" style="gap: 10px;">
+            <!-- Enable/Disable Toggle -->
+            <label class="checkbox_label" for="lovense_enabled">
+                <input type="checkbox" id="lovense_enabled" />
+                <span>Enable Lovense Control</span>
+            </label>
+
+            <small class="notes">
+                When enabled, the AI will be able to control your Lovense device during chats. Happy gooning!
+            </small>
+
+            <!-- Setup Instructions -->
+            <div class="lovense_setup_instructions">
+                <h4 style="margin-top: 10px; margin-bottom: 5px;">Setup Instructions</h4>
+
+                <div class="lovense_setup_tabs">
+                    <strong>Choose your setup:</strong>
+
+                    <details open>
+                        <summary><strong>Option 1: PC</strong></summary>
+                        <ol style="margin-top: 5px; margin-bottom: 5px;">
+                            <li>Download and install <a href="https://www.lovense.com/app/remote" target="_blank">Lovense Remote</a> on your PC</li>
+                            <li>Open Lovense Remote and pair your device via Bluetooth</li>
+                            <li>Make sure Lovense Remote is running in the background</li>
+                            <li>Click "Check Connection" below</li>
+                            <li>In the Lovense Remote, allow the third-party to connect</li>
+                        </ol>
+                    </details>
+
+                    <details open>
+                        <summary><strong>Option 2: Mobile</strong></summary>
+                        <ol style="margin-top: 5px; margin-bottom: 5px;">
+                            <li>Download <a href="https://apps.apple.com/app/lovense-remote/id1273067916" target="_blank">Lovense Remote</a> (iOS) or <a href="https://play.google.com/store/apps/details?id=com.lovense.remote" target="_blank">Android</a></li>
+                            <li>Open Lovense Remote and pair your device via Bluetooth</li>
+                            <li>Make sure your phone and PC are on the <strong>same WiFi network</strong></li>
+                            <li>In Lovense Remote, go to <strong>Discover → Game Mode → Turn on "Enable LAN"</strong></li>
+                            <li>In the Game Mode tab, find the local IP (e.g., "192-168-1-44.lovense.club")</li>
+                            <li>Enter that IP in "Advanced Connection Settings" below</li>
+                            <li>Click "Check Connection"</li>
+                            <li>In the Lovense Remote, allow the third-party to connect</li>
+                        </ol>
+                    </details>
+                </div>
+                </div>
+            </div>
+
+            <!-- Connection Section -->
+            <div id="lovense_connection_section">
+                <h4 style="margin-top: 10px; margin-bottom: 5px;">Device Connection</h4>
+
+                <div id="lovense_status" class="lovense_status disconnected">
+                    <strong>Status:</strong> <span id="lovense_status_text">Not Connected</span>
+                </div>
+
+                <button id="lovense_connect_button" class="menu_button">
+                    <i class="fa-solid fa-plug"></i> Check Connection
+                </button>
+
+                <div id="lovense_toys_section" style="display: none;">
+                    <h4 style="margin-top: 10px; margin-bottom: 5px;">Connected Toys</h4>
+                    <ul id="lovense_toy_list" class="lovense_toy_list"></ul>
+                </div>
+
+                <div class="lovense_advanced_settings" style="margin-top: 10px;">
+                    <details>
+                        <summary><strong>Advanced Connection Settings</strong></summary>
+                        <div style="padding: 10px 0;">
+                            <label for="lovense_local_ip" style="margin-bottom: 3px;">
+                                <b>Local IP/Domain</b>
+                            </label>
+                            <input type="text" id="lovense_local_ip" class="text_pole" value="127-0-0-1.lovense.club" />
+                            <small class="notes">
+                                <strong>PC:</strong> <code>127-0-0-1.lovense.club</code> (default)<br>
+                                <strong>Mobile:</strong> Find in Lovense Remote app settings (e.g., <code>192-168-1-44.lovense.club</code>)
+                            </small>
+
+                            <label for="lovense_local_port" style="margin-top: 10px; margin-bottom: 3px;">
+                                <b>Local Port</b>
+                            </label>
+                            <input type="text" id="lovense_local_port" class="text_pole" value="30010" />
+                            <small class="notes">
+                                <strong>PC:</strong> <code>30010</code> (default)<br>
+                                <strong>Mobile:</strong> Usually <code>34568</code> or shown in app settings
+                            </small>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- Prompt Settings -->
+                <div id="lovense_prompt_section" style="margin-top: 10px;">
+                    <h4 style="margin-top: 10px; margin-bottom: 5px;">AI Prompt Settings</h4>
+
+                    <label for="lovense_prompt_template" style="margin-bottom: 3px;">
+                        <b>Prompt Template</b>
+                    </label>
+                    <textarea id="lovense_prompt_template" class="text_pole textarea_compact" rows="8" placeholder="Enter the instruction for the AI..."></textarea>
+                    <small class="notes">
+                        This instruction tells the AI how to control the Lovense device. Available placeholders: {{toyList}} for connected toys.
+                        <br><strong>Note:</strong> The prompt is injected at depth 0 as a system message.
+                    </small>
+
+                    <button id="lovense_reset_prompt" class="menu_button" style="margin-top: 5px;">
+                        <i class="fa-solid fa-rotate-left"></i> Reset to Default Prompt
+                    </button>
+                </div>
+
+                <!-- Test Controls -->
+                <div id="lovense_test_section" style="margin-top: 10px;">
+                    <h4 style="margin-top: 10px; margin-bottom: 5px;">Test Controls</h4>
+                    <small class="notes">Test your Lovense device directly:</small>
+
+                    <div id="lovense_test_controls" style="margin-top: 5px;">
+                        <button id="lovense_test_vibrate" class="menu_button" disabled>
+                            <i class="fa-solid fa-bolt"></i> Test Vibrate (50%)
+                        </button>
+                        <button id="lovense_test_pulse" class="menu_button" disabled>
+                            <i class="fa-solid fa-wave-square"></i> Test Pulse Pattern
+                        </button>
+                        <button id="lovense_test_stop" class="menu_button" disabled>
+                            <i class="fa-solid fa-stop"></i> Stop
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Support Links -->
+                <div style="margin-top: 10px; display: flex; gap: 10px;">
+                    <a href="https://discord.com/invite/KdAkTg94ME" target="_blank" class="menu_button" style="flex: 1; text-align: center; text-decoration: none;">
+                        <i class="fa-brands fa-discord"></i> Discord
+                    </a>
+                    <a href="https://ko-fi.com/marinara_spaghetti" target="_blank" class="menu_button" style="flex: 1; text-align: center; text-decoration: none;">
+                        <i class="fa-solid fa-heart"></i> Support Creator
+                    </a>
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+</div>
