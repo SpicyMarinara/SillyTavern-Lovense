@@ -15,7 +15,8 @@ const MODULE_NAME = 'lovense';
 const EXTENSION_PROMPT_TAG = 'lovense_control';
 
 // Default prompt template
-const DEFAULT_PROMPT = `You can control the user's Lovense device during this conversation, here are the manuals:
+const DEFAULT_PROMPT = `
+You can control the user's Lovense device during this conversation, here are the manuals:
 <lovense>
 The user has these devices connected:
 {{toyList}}
@@ -28,12 +29,13 @@ Use the following commands in your response when appropriate:
 You can add parameters to your commands, examples:
 <lovense:vibrate intensity="15" duration="10"/> - Duration (vibrate at 15 for 10 seconds)
 <lovense:vibrate intensity="12" loop="5" pause="2" duration="20"/> - Looped (vibrate at 12, 5s on, 2s off, for 20s total)
+<lovense:vibrate intensity="10" duration="0"/> - Loop forever (duration="0" runs indefinitely until stopped)
 Important reminders about these commands:
-1. Only use them when they fit in the context (for instance, mirroring character actions).
+1. Use them when they fit in the context (for instance, mirroring character actions).
 2. Match intensity to the scene (gentle = 5-10, moderate = 11-15, intense = 16-20).
 3. You can use multiple ones throughout the entire response, as the scene progresses.
-4. They will be automatically hidden from the user's view.
-</lovense>`;
+</lovense>
+`;
 
 // Settings with defaults
 const defaultSettings = {
