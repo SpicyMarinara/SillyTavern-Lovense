@@ -145,7 +145,7 @@ When enabled, the extension injects a system prompt that teaches the AI how to c
 
 The commands are parsed by the extension and sent to your device while being automatically hidden from view in the chat.
 
-***Works with both streaming off and on. When streaming is on, they commands will trigger during the generation process. When streaming is off, they are queued and played one after another after the message is displayed in your chat.
+***Works with both streaming off and on. When streaming is on, they commands will trigger during the generation process. When streaming is off, they are queued and played one after another after the message is displayed in your chat.***
 
 ## 🎨 Customization
 
