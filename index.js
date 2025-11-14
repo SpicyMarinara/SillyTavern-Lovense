@@ -61,7 +61,7 @@ async function checkConnection() {
 
     try {
         // Use SillyTavern's proxy to avoid CORS issues with self-signed certificates
-        const response = await fetch('/api/lovense/command', {
+        const response = await fetch('/api/plugins/lovense/command', {
             method: 'POST',
             headers: getRequestHeaders(),
             body: JSON.stringify({
@@ -148,7 +148,7 @@ async function sendLovenseCommand(command) {
         const lovenseUrl = `https://${settings.local_ip}:${settings.local_port}/command`;
 
         // Use SillyTavern's proxy to avoid CORS issues
-        const response = await fetch('/api/lovense/command', {
+        const response = await fetch('/api/plugins/lovense/command', {
             method: 'POST',
             headers: getRequestHeaders(),
             body: JSON.stringify({

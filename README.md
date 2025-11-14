@@ -20,34 +20,46 @@ In SillyTavern:
 2. Paste the repository URL: `https://github.com/SpicyMarinara/SillyTavern-Lovense`
 3. Click **Install for all users/Install just for me**
 
-### 2. Add Server Endpoint
+### 2. Add Server Plugin
 
-**Enable server plugins** in your `config.yaml`:
+The extension needs a server-side proxy to communicate with Lovense Remote (to bypass browser CORS restrictions).
+
+**Step 1: Enable server plugins** in your `config.yaml`:
 ```yaml
 enableServerPlugins: true
 ```
 
 ![png](https://i.imgur.com/rmySG4N.png)
 
-The extension needs a server-side proxy to communicate with Lovense Remote (to bypass browser CORS restrictions).
+**Step 2: Copy the plugin file**
 
 **Option A: Using File Explorer (Easy)**
 
 1. Open your SillyTavern folder
 2. Navigate to: `data/default-user/extensions/SillyTavern-Lovense/server/`
 3. Copy the file `lovense.js`
-4. Navigate to: `src/endpoints/`
+4. Navigate to: `plugins/`
 5. Paste the file there
 
-![png](https://i.imgur.com/WX3UPFP.png)
+**Option B: Using Command Line**
 
-**Option B: Using Command Line (Nerd)**
-
-```bash
-cp data/default-user/extensions/SillyTavern-Lovense/server/lovense.js src/endpoints/
+**Windows (PowerShell or Command Prompt):**
+```batch
+copy data\default-user\extensions\SillyTavern-Lovense\server\lovense.js plugins\
 ```
 
-**Restart SillyTavern** - the endpoint will be automatically loaded from `src/endpoints/lovense.js`
+**Mac/Linux:**
+```bash
+cp data/default-user/extensions/SillyTavern-Lovense/server/lovense.js plugins/
+```
+
+**Step 3: Restart SillyTavern completely** - Close the server/launcher and start it again. The plugin will be automatically loaded.
+
+You should see this message in the server console:
+```
+Loading Lovense Control server plugin...
+Lovense Control server plugin loaded successfully
+```
 
 ### 3. Setup Lovense Remote & Connect
 
@@ -185,10 +197,10 @@ All Lovense devices supported by the Lovense Remote app:
 
 **This means the server endpoint wasn't installed correctly.** You need to:
 
-1. **Copy the server file:**
+1. **Copy the server plugin file:**
    - Navigate to `data/default-user/extensions/SillyTavern-Lovense/server/`
    - Copy `lovense.js`
-   - Paste it into `src/endpoints/`
+   - Paste it into the `plugins/` folder (in SillyTavern root directory)
 
 2. **Enable server plugins** in `config.yaml`:
    ```yaml
@@ -197,11 +209,18 @@ All Lovense devices supported by the Lovense Remote app:
 
 3. **Restart SillyTavern completely**
 
-4. Try "Check Connection" again
+4. **Check the console** - You should see:
+   ```
+   Loading Lovense Control server plugin...
+   Lovense Control server plugin loaded successfully
+   ```
+
+5. Try "Check Connection" again
 
 If still not working:
-- Verify `lovense.js` exists in `src/endpoints/` folder
-- Check the SillyTavern server console for any error messages
+- Verify `lovense.js` exists in the `plugins/` folder (not `src/endpoints/`)
+- On Windows, make sure the file is named `lovense.js` (not `lovense.js.txt`)
+- Check the SillyTavern server console for error messages
 - Make sure you restarted SillyTavern after copying the file
 
 ### Device Not Connecting
