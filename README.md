@@ -22,6 +22,13 @@ In SillyTavern:
 
 ### 2. Add Server Endpoint
 
+**Enable server plugins** in your `config.yaml`:
+```yaml
+enableServerPlugins: true
+```
+
+![png](https://i.imgur.com/rmySG4N.png)
+
 The extension needs a server-side proxy to communicate with Lovense Remote (to bypass browser CORS restrictions).
 
 **Option A: Using File Explorer (Easy)**
@@ -39,13 +46,6 @@ The extension needs a server-side proxy to communicate with Lovense Remote (to b
 ```bash
 cp data/default-user/extensions/SillyTavern-Lovense/server/lovense.js src/endpoints/
 ```
-
-**Enable server plugins** in your `config.yaml`:
-```yaml
-enableServerPlugins: true
-```
-
-![png](https://i.imgur.com/rmySG4N.png)
 
 **Restart SillyTavern** - the endpoint will be automatically loaded from `src/endpoints/lovense.js`
 
@@ -179,9 +179,32 @@ All Lovense devices supported by the Lovense Remote app:
 - Pumping devices (Max)
 - And more
 
-## 🔧 Troubleshooting
+## � Troubleshooting
 
-### "Not Connected" Status
+### "Not Connected" Status / HTTP 404 Error
+
+**This means the server endpoint wasn't installed correctly.** You need to:
+
+1. **Copy the server file:**
+   - Navigate to `data/default-user/extensions/SillyTavern-Lovense/server/`
+   - Copy `lovense.js`
+   - Paste it into `src/endpoints/`
+
+2. **Enable server plugins** in `config.yaml`:
+   ```yaml
+   enableServerPlugins: true
+   ```
+
+3. **Restart SillyTavern completely**
+
+4. Try "Check Connection" again
+
+If still not working:
+- Verify `lovense.js` exists in `src/endpoints/` folder
+- Check the SillyTavern server console for any error messages
+- Make sure you restarted SillyTavern after copying the file
+
+### Device Not Connecting
 
 - Ensure **Lovense Remote** is running on your PC
 - Check that your device is paired in Lovense Remote (shows as connected there)
