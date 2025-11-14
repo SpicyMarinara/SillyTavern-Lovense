@@ -66,13 +66,13 @@ See the [Setup](#setup) section below for PC or Mobile instructions.
 
 3. Make sure Lovense Remote is running in the background
 
-4. Click "Check Connection" in the Lovense Control extension menu
+4. In SillyTavern: **Extensions** → **Lovense Control** → **Check Connection**
 
-5. Keep Lovense Remote running in the background
+5. In the Lovense Remote app, allow the third-party to connect
 
-6. In the Lovense Remote, allow the third-party to connect
+6. Toggle **Enable Lovense Control** in the extension menu
 
-7. Toggle **Enable Lovense Control** to activate
+**If you see Status: Connected, you're good to go!**
 
 ### Option 2: Mobile (Requires Same WiFi Network)
 
@@ -97,9 +97,11 @@ See the [Setup](#setup) section below for PC or Mobile instructions.
 
 8. Click **Check Connection**
 
-9. In the Lovense Remote, allow the third-party to connect
+9. In the Lovense Remote app, allow the third-party to connect
 
-10. Toggle **Enable Lovense Control** to activate
+10. Toggle **Enable Lovense Control** in the extension menu
+
+**If you see Status: Connected, you're good to go!**
 
 ## ✨ How It Works
 
