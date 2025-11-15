@@ -51,6 +51,7 @@ const defaultSettings = {
 let connectedToys = {};
 let connectionCheckInterval = null;
 let executedCommands = new Set(); // Track executed commands during streaming
+let lastCommand = null; // Track the last command sent
 
 /**
  * Check connection to Lovense Remote
@@ -136,7 +137,7 @@ function updateConnectionStatus() {
 /**
  * Send command to Lovense device(s)
  */
-async function sendLovenseCommand(command) {
+async function sendLovenseCommand(command, trackAsLast = true) {
     const settings = extension_settings[MODULE_NAME];
 
     if (!settings.connected) {
@@ -159,6 +160,12 @@ async function sendLovenseCommand(command) {
 
         const result = await response.json();
         console.log('[Lovense] Command sent:', command, 'Result:', result);
+
+        // Track this as the last command if it's not a stop command and tracking is enabled
+        if (trackAsLast && command.action !== 'Stop') {
+            lastCommand = command;
+        }
+
         return result.code === 200;
     } catch (error) {
         console.error('[Lovense] Error sending command:', error);
@@ -238,6 +245,60 @@ function parseAICommands(text) {
 }
 
 /**
+ * Start looping the last command
+ */
+function startLoopingLastCommand() {
+    // Stop any existing loop
+    stopLoopingLastCommand();
+
+    if (!lastCommand) {
+        console.log('[Lovense] No last command to loop');
+        return;
+    }
+
+    // Don't loop stop commands
+    if (lastCommand.action === 'Stop') {
+        return;
+    }
+
+    console.log('[Lovense] Starting infinite loop for last command:', lastCommand);
+
+    // Create a looping version of the command that runs indefinitely
+    const loopCommand = { ...lastCommand };
+
+    // Set timeSec to 0 to loop indefinitely until stopped or overridden
+    loopCommand.timeSec = 0;
+
+    // Remove any existing loop parameters since we're using duration=0 for infinite loop
+    delete loopCommand.loopRunningSec;
+    delete loopCommand.loopPauseSec;
+
+    // Send the command to start looping indefinitely
+    sendLovenseCommand(loopCommand, false);
+}
+
+/**
+ * Stop looping the last command
+ */
+function stopLoopingLastCommand() {
+    const settings = extension_settings[MODULE_NAME];
+
+    if (!settings.connected) {
+        return;
+    }
+
+    // Send a stop command to halt any infinite looping
+    sendLovenseCommand({
+        command: 'Function',
+        action: 'Stop',
+        timeSec: 0,
+        apiVer: 1,
+    }, false);
+
+    console.log('[Lovense] Stopped looping last command');
+}
+
+/**
  * Handle streaming token received event
  * Executes commands in real-time as they appear during streaming
  */
@@ -257,6 +318,8 @@ async function onStreamTokenReceived(text) {
 
         if (!executedCommands.has(commandKey)) {
             console.log('[Lovense] Executing command during streaming:', command);
+            // Stop looping when a new command comes in
+            stopLoopingLastCommand();
             executedCommands.add(commandKey);
             await sendLovenseCommand(command);
         }
@@ -295,6 +358,8 @@ async function onMessageReceived(messageId) {
         const commandKey = JSON.stringify(command);
 
         if (!executedCommands.has(commandKey)) {
+            // Stop looping when a new command comes in
+            stopLoopingLastCommand();
             executedCommands.add(commandKey);
             await sendLovenseCommand(command);
         }
@@ -302,6 +367,9 @@ async function onMessageReceived(messageId) {
 
     // Clear the executed commands set for the next message
     executedCommands.clear();
+
+    // Start looping the last command after all commands are executed
+    startLoopingLastCommand();
 }
 
 /**
@@ -309,6 +377,16 @@ async function onMessageReceived(messageId) {
  */
 function onGenerationStarted() {
     executedCommands.clear();
+    // Stop any looping when new generation starts
+    stopLoopingLastCommand();
+}
+
+/**
+ * Handle generation ended event to start looping
+ */
+function onGenerationEnded() {
+    // Start looping the last command when streaming ends
+    startLoopingLastCommand();
 }
 
 /**
@@ -538,6 +616,9 @@ jQuery(async () => {
 
     // Clear command tracking when generation starts
     eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
+
+    // Start looping when generation ends
+    eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
 
     // Listen for chat changes to update prompt
     eventSource.on(event_types.CHAT_CHANGED, updatePrompt);
