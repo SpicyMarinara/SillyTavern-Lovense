@@ -37,7 +37,7 @@ enableServerPlugins: true
 
 1. Open your SillyTavern folder
 2. Navigate to: `data/default-user/extensions/SillyTavern-Lovense/server/`
-3. Copy the file `lovense.js`
+3. Copy the file `lovense.mjs`
 4. Navigate to: `plugins/`
 5. Paste the file there
 
@@ -45,12 +45,12 @@ enableServerPlugins: true
 
 **Windows (PowerShell or Command Prompt):**
 ```batch
-copy data\default-user\extensions\SillyTavern-Lovense\server\lovense.js plugins\
+copy data\default-user\extensions\SillyTavern-Lovense\server\lovense.mjs plugins\
 ```
 
 **Mac/Linux:**
 ```bash
-cp data/default-user/extensions/SillyTavern-Lovense/server/lovense.js plugins/
+cp data/default-user/extensions/SillyTavern-Lovense/server/lovense.mjs plugins/
 ```
 
 **Step 3: Restart SillyTavern completely** - Close the server/launcher and start it again. The plugin will be automatically loaded.
@@ -199,7 +199,7 @@ All Lovense devices supported by the Lovense Remote app:
 
 1. **Copy the server plugin file:**
    - Navigate to `data/default-user/extensions/SillyTavern-Lovense/server/`
-   - Copy `lovense.js`
+   - Copy `lovense.mjs`
    - Paste it into the `plugins/` folder (in SillyTavern root directory)
 
 2. **Enable server plugins** in `config.yaml`:
@@ -218,8 +218,8 @@ All Lovense devices supported by the Lovense Remote app:
 5. Try "Check Connection" again
 
 If still not working:
-- Verify `lovense.js` exists in the `plugins/` folder (not `src/endpoints/`)
-- On Windows, make sure the file is named `lovense.js` (not `lovense.js.txt`)
+- Verify `lovense.mjs` exists in the `plugins/` folder (not `src/endpoints/`)
+- On Windows, make sure the file is named `lovense.mjs` (not `lovense.mjs.txt`)
 - Check the SillyTavern server console for error messages
 - Make sure you restarted SillyTavern after copying the file
 
