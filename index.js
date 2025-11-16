@@ -137,7 +137,7 @@ function updateConnectionStatus() {
 /**
  * Send command to Lovense device(s)
  */
-async function sendLovenseCommand(command, trackAsLast = true) {
+async function sendLovenseCommand(command, trackAsLast = true, silent = false) {
     const settings = extension_settings[MODULE_NAME];
 
     if (!settings.connected) {
@@ -164,12 +164,16 @@ async function sendLovenseCommand(command, trackAsLast = true) {
         // Track this as the last command if it's not a stop command and tracking is enabled
         if (trackAsLast && command.action !== 'Stop') {
             lastCommand = command;
+            console.log('[Lovense] Tracked as last command:', lastCommand);
         }
 
         return result.code === 200;
     } catch (error) {
-        console.error('[Lovense] Error sending command:', error);
-        toastr.error('Failed to send command to Lovense device');
+        // Only log and show errors if not silent
+        if (!silent) {
+            console.error('[Lovense] Error sending command:', error);
+            toastr.error('Failed to send command to Lovense device');
+        }
         return false;
     }
 }
@@ -248,8 +252,7 @@ function parseAICommands(text) {
  * Start looping the last command
  */
 function startLoopingLastCommand() {
-    // Stop any existing loop
-    stopLoopingLastCommand();
+    console.log('[Lovense] startLoopingLastCommand called, lastCommand:', lastCommand);
 
     if (!lastCommand) {
         console.log('[Lovense] No last command to loop');
@@ -258,6 +261,7 @@ function startLoopingLastCommand() {
 
     // Don't loop stop commands
     if (lastCommand.action === 'Stop') {
+        console.log('[Lovense] Last command is Stop, not looping');
         return;
     }
 
@@ -287,13 +291,13 @@ function stopLoopingLastCommand() {
         return;
     }
 
-    // Send a stop command to halt any infinite looping
+    // Send a stop command to halt any infinite looping (silently to avoid error spam)
     sendLovenseCommand({
         command: 'Function',
         action: 'Stop',
         timeSec: 0,
         apiVer: 1,
-    }, false);
+    }, false, true);
 
     console.log('[Lovense] Stopped looping last command');
 }
@@ -385,6 +389,7 @@ function onGenerationStarted() {
  * Handle generation ended event to start looping
  */
 function onGenerationEnded() {
+    console.log('[Lovense] Generation ended, last command:', lastCommand);
     // Start looping the last command when streaming ends
     startLoopingLastCommand();
 }
