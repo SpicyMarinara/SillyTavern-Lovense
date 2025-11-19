@@ -8,9 +8,9 @@ This extension allows AI characters in SillyTavern to control your Lovense devic
 
 You're welcome.
 
-Oh, and if you're planning on getting a Lovense device just so your AI waifu/husbandu can do the deed with you, consider using my referral link, thanks!
+***Oh, and if you're planning on getting a Lovense device just so your AI waifu/husbandu can do the deed with you, consider using my referral link, thanks! By purchasing the toys through it, you support me directly, as I'm now Lovense's official affiliate. Yepee!
 
-Get $10 OFF your first Lovense order via my referral link: https://www.lovense.com/referral-coupon?rfcode=my0xcchc
+Get 55% OFF your Lovense order via my referral link: https://www.lovense.com/a/SpicyMarinara***
 
 [![My Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da)](https://discord.com/invite/KdAkTg94ME)
 [![Support Me](https://img.shields.io/badge/Ko--fi-Support%20Creator-ff5e5b)](https://ko-fi.com/marinara_spaghetti)
