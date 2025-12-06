@@ -29,11 +29,11 @@ Use the following commands in your response when appropriate:
 You can add parameters to your commands, examples:
 <lovense:vibrate intensity="15" duration="10"/> - Duration (vibrate at 15 for 10 seconds)
 <lovense:vibrate intensity="12" loop="5" pause="2" duration="20"/> - Looped (vibrate at 12, 5s on, 2s off, for 20s total)
-<lovense:vibrate intensity="10" duration="0"/> - Loop forever (duration="0" runs indefinitely until stopped)
 Important reminders about these commands:
 1. Use them when they fit in the context (for instance, mirroring character actions).
 2. Match intensity to the scene (gentle = 5-10, moderate = 11-15, intense = 16-20).
 3. You can use multiple ones throughout the entire response, as the scene progresses.
+4. The last command in your message will automatically continue until your next response.
 </lovense>
 `;
 
@@ -214,10 +214,12 @@ function parseAICommands(text) {
             const presetName = (attrs.name || '').toLowerCase();
             if (!presetName) continue;
 
+            const duration = attrs.duration !== undefined ? parseFloat(attrs.duration) : 5;
+
             commands.push({
                 command: 'Preset',
                 name: presetName,
-                timeSec: parseFloat(attrs.duration) || 5,
+                timeSec: duration,
                 apiVer: 1,
             });
             continue;
@@ -227,10 +229,14 @@ function parseAICommands(text) {
         const intensity = parseInt(attrs.intensity);
         if (isNaN(intensity)) continue;
 
+        // Parse duration - use 5 as default only if duration is not specified
+        // Don't use || because duration="0" is valid (infinite loop)
+        const duration = attrs.duration !== undefined ? parseFloat(attrs.duration) : 5;
+
         const commandObj = {
             command: 'Function',
             action: `${action}:${intensity}`,
-            timeSec: parseFloat(attrs.duration) || 5,
+            timeSec: duration,
             apiVer: 1,
         };
 
@@ -270,10 +276,11 @@ function startLoopingLastCommand() {
     // Create a looping version of the command that runs indefinitely
     const loopCommand = { ...lastCommand };
 
-    // Set timeSec to 0 to loop indefinitely until stopped or overridden
+    // Set timeSec to 0 to loop indefinitely until stopped (per Lovense API docs)
     loopCommand.timeSec = 0;
 
-    // Remove any existing loop parameters since we're using duration=0 for infinite loop
+    // Remove loop parameters when using infinite duration
+    // Having both timeSec=0 and loop parameters can cause conflicts
     delete loopCommand.loopRunningSec;
     delete loopCommand.loopPauseSec;
 
