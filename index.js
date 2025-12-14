@@ -52,6 +52,7 @@ let connectedToys = {};
 let connectionCheckInterval = null;
 let executedCommands = new Set(); // Track executed commands during streaming
 let lastCommand = null; // Track the last command sent
+let loopTimeout = null; // Timeout for scheduling the infinite loop
 
 /**
  * Check connection to Lovense Remote
@@ -260,6 +261,12 @@ function parseAICommands(text) {
 function startLoopingLastCommand() {
     console.log('[Lovense] startLoopingLastCommand called, lastCommand:', lastCommand);
 
+    // Clear any existing scheduled loop
+    if (loopTimeout) {
+        clearTimeout(loopTimeout);
+        loopTimeout = null;
+    }
+
     if (!lastCommand) {
         console.log('[Lovense] No last command to loop');
         return;
@@ -271,27 +278,48 @@ function startLoopingLastCommand() {
         return;
     }
 
-    console.log('[Lovense] Starting infinite loop for last command:', lastCommand);
+    // Don't loop if the command already has infinite duration
+    if (lastCommand.timeSec === 0) {
+        console.log('[Lovense] Last command already has infinite duration, not looping');
+        return;
+    }
 
-    // Create a looping version of the command that runs indefinitely
-    const loopCommand = { ...lastCommand };
+    console.log('[Lovense] Scheduling infinite loop for last command after', lastCommand.timeSec, 'seconds');
 
-    // Set timeSec to 0 to loop indefinitely until stopped (per Lovense API docs)
-    loopCommand.timeSec = 0;
+    // Schedule the infinite loop to start AFTER the original command finishes
+    // Add a small buffer (500ms) to ensure the original command has completed
+    const delayMs = (lastCommand.timeSec * 1000) + 500;
 
-    // Remove loop parameters when using infinite duration
-    // Having both timeSec=0 and loop parameters can cause conflicts
-    delete loopCommand.loopRunningSec;
-    delete loopCommand.loopPauseSec;
+    loopTimeout = setTimeout(() => {
+        console.log('[Lovense] Starting infinite loop for command:', lastCommand);
 
-    // Send the command to start looping indefinitely
-    sendLovenseCommand(loopCommand, false);
+        // Create a looping version of the command that runs indefinitely
+        const loopCommand = { ...lastCommand };
+
+        // Set timeSec to 0 to loop indefinitely until stopped (per Lovense API docs)
+        loopCommand.timeSec = 0;
+
+        // Remove loop parameters when using infinite duration
+        // Having both timeSec=0 and loop parameters can cause conflicts
+        delete loopCommand.loopRunningSec;
+        delete loopCommand.loopPauseSec;
+
+        // Send the command to start looping indefinitely
+        sendLovenseCommand(loopCommand, false);
+    }, delayMs);
 }
 
 /**
  * Stop looping the last command
  */
 function stopLoopingLastCommand() {
+    // Clear any scheduled loop
+    if (loopTimeout) {
+        clearTimeout(loopTimeout);
+        loopTimeout = null;
+        console.log('[Lovense] Cleared scheduled loop');
+    }
+
     const settings = extension_settings[MODULE_NAME];
 
     if (!settings.connected) {
