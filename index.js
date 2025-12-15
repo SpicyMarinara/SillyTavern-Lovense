@@ -234,9 +234,12 @@ function parseAICommands(text) {
         // Don't use || because duration="0" is valid (infinite loop)
         const duration = attrs.duration !== undefined ? parseFloat(attrs.duration) : 5;
 
+        // Capitalize action name to match Lovense API requirements
+        const capitalizedAction = action.charAt(0).toUpperCase() + action.slice(1).toLowerCase();
+
         const commandObj = {
             command: 'Function',
-            action: `${action}:${intensity}`,
+            action: `${capitalizedAction}:${intensity}`,
             timeSec: duration,
             apiVer: 1,
         };
@@ -356,11 +359,13 @@ async function onStreamTokenReceived(text) {
         const commandKey = JSON.stringify(command);
 
         if (!executedCommands.has(commandKey)) {
-            console.log('[Lovense] Executing command during streaming:', command);
+            console.log('[Lovense] Executing command during streaming:', JSON.stringify(command));
             // Stop looping when a new command comes in
             stopLoopingLastCommand();
             executedCommands.add(commandKey);
             await sendLovenseCommand(command);
+        } else {
+            console.log('[Lovense] Skipping duplicate command:', JSON.stringify(command));
         }
     }
 }
