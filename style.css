@@ -2,6 +2,11 @@
     padding: 10px;
 }
 
+/* Hide Lovense commands from display */
+.lovense-command {
+    display: none !important;
+}
+
 .lovense_qr_container {
     display: flex;
     flex-direction: column;

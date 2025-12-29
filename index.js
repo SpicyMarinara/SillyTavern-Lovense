@@ -14,45 +14,57 @@ import {
 const MODULE_NAME = 'lovense';
 const EXTENSION_PROMPT_TAG = 'lovense_control';
 
-// Default prompt template
-const DEFAULT_PROMPT = `
-You can control the user's Lovense device during this conversation, here are the manuals:
-<lovense>
-The user has these devices connected:
-{{toyList}}
-Use the following commands in your response when appropriate:
-<lovense:vibrate intensity="X"/> - Vibrate at intensity X (0-20)
-<lovense:rotate intensity="X"/> - Rotate at intensity X (0-20) (for compatible devices)
-<lovense:pump intensity="X"/> - Pump at intensity X (0-3) (for compatible devices)
-<lovense:preset name="NAME"/> - Use preset pattern (pulse, wave, fireworks, earthquake)
-<lovense:stop/> - Stop all activity
-You can add parameters to your commands, examples:
-<lovense:vibrate intensity="15" duration="10"/> - Duration (vibrate at 15 for 10 seconds)
-<lovense:vibrate intensity="12" loop="5" pause="2" duration="20"/> - Looped (vibrate at 12, 5s on, 2s off, for 20s total)
-Important reminders about these commands:
-1. Use them when they fit in the context (for instance, mirroring character actions).
-2. Match intensity to the scene (gentle = 5-10, moderate = 11-15, intense = 16-20).
-3. You can use multiple ones throughout the entire response, as the scene progresses.
-4. The last command in your message will automatically continue until your next response.
-</lovense>
-`;
+// Toy capability mappings
+const TOY_CAPABILITIES = {
+    // Rotating toys
+    'nora': ['vibrate', 'rotate'],
+    'diamo': ['vibrate', 'rotate'],
+    'ridge': ['vibrate', 'rotate'],
+
+    // Pumping toys
+    'max': ['vibrate', 'pump'],
+    'max 2': ['vibrate', 'pump'],
+
+    // Thrusting toys
+    'gravity': ['vibrate', 'thrusting'],
+    'sex machine': ['vibrate', 'thrusting'],
+    'mini sex machine': ['vibrate', 'thrusting'],
+
+    // Fingering toys
+    'flexer': ['vibrate', 'fingering'],
+
+    // Suction toys
+    'tenera': ['vibrate', 'suction'],
+    'tenera 2': ['vibrate', 'suction'],
+
+    // Oscillating toys
+    'osci': ['vibrate', 'oscillate'],
+    'osci 2': ['vibrate', 'oscillate'],
+    'osci 3': ['vibrate', 'oscillate'],
+};
 
 // Settings with defaults
 const defaultSettings = {
     enabled: false,
-    prompt_template: DEFAULT_PROMPT,
     connected: false,
     toys: {},
     local_ip: '127-0-0-1.lovense.club',
     local_port: '30010',
+    guidelines: `1. Match intensity to context: gentle (1-10), moderate (11-15), intense (16-20)
+2. Use commands that fit the scene naturally
+3. Multiple commands per response allowed
+4. Commands loop until your next response`,
 };
 
 // Lovense API state
 let connectedToys = {};
 let connectionCheckInterval = null;
 let executedCommands = new Set(); // Track executed commands during streaming
-let lastCommand = null; // Track the last command sent
-let loopTimeout = null; // Timeout for scheduling the infinite loop
+let messageCommands = []; // Track all commands from the current message
+let loopInterval = null; // Interval for looping commands
+let currentLoopIndex = 0; // Current position in the loop
+let streamingText = ''; // Accumulate streaming text
+let isLooping = false; // Flag to control loop execution
 
 /**
  * Check connection to Lovense Remote
@@ -162,12 +174,6 @@ async function sendLovenseCommand(command, trackAsLast = true, silent = false) {
         const result = await response.json();
         console.log('[Lovense] Command sent:', command, 'Result:', result);
 
-        // Track this as the last command if it's not a stop command and tracking is enabled
-        if (trackAsLast && command.action !== 'Stop') {
-            lastCommand = command;
-            console.log('[Lovense] Tracked as last command:', lastCommand);
-        }
-
         return result.code === 200;
     } catch (error) {
         // Only log and show errors if not silent
@@ -180,16 +186,31 @@ async function sendLovenseCommand(command, trackAsLast = true, silent = false) {
 }
 
 /**
+ * Find toy ID by device name
+ */
+function findToyIdByName(deviceName) {
+    const nameLower = deviceName.toLowerCase();
+    for (const [id, toy] of Object.entries(connectedToys)) {
+        const toyName = (toy.name || '').toLowerCase();
+        const nickName = (toy.nickName || '').toLowerCase();
+        if (toyName === nameLower || nickName === nameLower) {
+            return id;
+        }
+    }
+    return null;
+}
+
+/**
  * Parse AI response for Lovense commands
  */
 function parseAICommands(text) {
-    // Match <lovense:action intensity="X" param="value"/> or <lovense:action/>
+    // Match <lovense:action param="value"/> or <lovense:action/>
     const commandRegex = /<lovense:(\w+)([^>]*?)\/>/gi;
     const commands = [];
     let match;
 
     while ((match = commandRegex.exec(text)) !== null) {
-        const action = match[1]; // vibrate, rotate, pump, preset, stop
+        const action = match[1]; // vibrate, rotate, pump, preset, stop, pattern
         const attributesStr = match[2];
 
         // Parse attributes
@@ -199,6 +220,13 @@ function parseAICommands(text) {
 
         while ((attrMatch = attrRegex.exec(attributesStr)) !== null) {
             attrs[attrMatch[1].toLowerCase()] = attrMatch[2];
+        }
+
+        // Handle shorthand format: <lovense:vibrate="3"/> where the first value has no attribute name
+        // Check if attributesStr starts with =" (shorthand format)
+        const shorthandMatch = /^\s*="([^"]+)"/.exec(attributesStr);
+        if (shorthandMatch) {
+            attrs[action.toLowerCase()] = shorthandMatch[1];
         }
 
         if (action.toLowerCase() === 'stop') {
@@ -215,34 +243,199 @@ function parseAICommands(text) {
             const presetName = (attrs.name || '').toLowerCase();
             if (!presetName) continue;
 
-            const duration = attrs.duration !== undefined ? parseFloat(attrs.duration) : 5;
+            const duration = attrs.time || attrs.duration || 5;
 
-            commands.push({
+            const presetObj = {
                 command: 'Preset',
                 name: presetName,
-                timeSec: duration,
+                timeSec: parseFloat(duration),
                 apiVer: 1,
+            };
+
+            // Add device targeting if specified
+            if (attrs.device) {
+                const deviceName = attrs.device.toLowerCase();
+                const toyId = findToyIdByName(deviceName);
+                if (toyId) {
+                    presetObj.toy = toyId;
+                }
+            }
+
+            commands.push(presetObj);
+            continue;
+        }
+
+        // Handle pattern commands
+        if (action.toLowerCase() === 'pattern') {
+            const strength = attrs.strength;
+            if (!strength) continue;
+
+            const duration = attrs.time || attrs.duration || 0;
+            const interval = attrs.interval || 150;
+
+            // Build rule string based on which functions are enabled
+            const functions = [];
+            if (attrs.vibrate === 'true' || attrs.vibrate === '1' || !attrs.vibrate) functions.push('v');
+            if (attrs.rotate === 'true' || attrs.rotate === '1') functions.push('r');
+            if (attrs.pump === 'true' || attrs.pump === '1') functions.push('p');
+            if (attrs.thrusting === 'true' || attrs.thrusting === '1') functions.push('t');
+            if (attrs.fingering === 'true' || attrs.fingering === '1') functions.push('f');
+            if (attrs.suction === 'true' || attrs.suction === '1') functions.push('s');
+            if (attrs.depth === 'true' || attrs.depth === '1') functions.push('d');
+            if (attrs.oscillate === 'true' || attrs.oscillate === '1') functions.push('o');
+
+            const rule = `V:1;F:${functions.join(',')};S:${interval}#`;
+
+            commands.push({
+                command: 'Pattern',
+                rule: rule,
+                strength: strength,
+                timeSec: parseFloat(duration),
+                apiVer: 2,
             });
             continue;
         }
 
-        // Parse intensity for vibrate, rotate, pump
-        const intensity = parseInt(attrs.intensity);
-        if (isNaN(intensity)) continue;
+        // Handle combo commands (vibrate + rotate + pump + thrusting + fingering + suction + depth + oscillate + stroke + all)
+        if (action.toLowerCase() === 'combo') {
+            const actions = [];
 
-        // Parse duration - use 5 as default only if duration is not specified
-        // Don't use || because duration="0" is valid (infinite loop)
-        const duration = attrs.duration !== undefined ? parseFloat(attrs.duration) : 5;
+            if (attrs.vibrate) {
+                const intensity = parseInt(attrs.vibrate);
+                if (!isNaN(intensity)) {
+                    actions.push(`Vibrate:${intensity}`);
+                }
+            }
+
+            if (attrs.rotate) {
+                const intensity = parseInt(attrs.rotate);
+                if (!isNaN(intensity)) {
+                    actions.push(`Rotate:${intensity}`);
+                }
+            }
+
+            if (attrs.pump) {
+                const intensity = parseInt(attrs.pump);
+                if (!isNaN(intensity)) {
+                    actions.push(`Pump:${intensity}`);
+                }
+            }
+
+            if (attrs.thrusting) {
+                const intensity = parseInt(attrs.thrusting);
+                if (!isNaN(intensity)) {
+                    actions.push(`Thrusting:${intensity}`);
+                }
+            }
+
+            if (attrs.fingering) {
+                const intensity = parseInt(attrs.fingering);
+                if (!isNaN(intensity)) {
+                    actions.push(`Fingering:${intensity}`);
+                }
+            }
+
+            if (attrs.suction) {
+                const intensity = parseInt(attrs.suction);
+                if (!isNaN(intensity)) {
+                    actions.push(`Suction:${intensity}`);
+                }
+            }
+
+            if (attrs.depth) {
+                const intensity = parseInt(attrs.depth);
+                if (!isNaN(intensity)) {
+                    actions.push(`Depth:${intensity}`);
+                }
+            }
+
+            if (attrs.oscillate) {
+                const intensity = parseInt(attrs.oscillate);
+                if (!isNaN(intensity)) {
+                    actions.push(`Oscillate:${intensity}`);
+                }
+            }
+
+            if (attrs.stroke) {
+                // Stroke can be a single value or a range like "0-50"
+                actions.push(`Stroke:${attrs.stroke}`);
+            }
+
+            if (attrs.all) {
+                const intensity = parseInt(attrs.all);
+                if (!isNaN(intensity)) {
+                    actions.push(`All:${intensity}`);
+                }
+            }
+
+            if (actions.length === 0) continue;
+
+            const duration = attrs.time || attrs.duration || 5;
+
+            const commandObj = {
+                command: 'Function',
+                action: actions.join(','),
+                timeSec: parseFloat(duration),
+                apiVer: 1,
+            };
+
+            // Parse optional loop parameters
+            if (attrs.loop) {
+                commandObj.loopRunningSec = parseFloat(attrs.loop);
+            }
+            if (attrs.pause) {
+                commandObj.loopPauseSec = parseFloat(attrs.pause);
+            }
+
+            // Add stopPrevious parameter if specified (default is 1)
+            if (attrs.stopprevious !== undefined) {
+                commandObj.stopPrevious = parseInt(attrs.stopprevious);
+            }
+
+            commands.push(commandObj);
+            continue;
+        }
+
+        // Parse intensity for individual action commands
+        // Support both old format (intensity="X") and new format (action="X")
+        let intensity;
+        let actionString;
+        const actionLower = action.toLowerCase();
+
+        if (actionLower === 'stroke') {
+            // Stroke can be intensity or range (e.g., "0-50")
+            actionString = attrs[actionLower] || attrs.intensity || attrs.range || '0-100';
+        } else {
+            // Try new format first (e.g., vibrate="15"), then fall back to old format (intensity="15")
+            const intensityValue = attrs[actionLower] || attrs.intensity;
+            if (!intensityValue) continue;
+
+            intensity = parseInt(intensityValue);
+            if (isNaN(intensity)) continue;
+            actionString = intensity.toString();
+        }
+
+        // Parse duration - support both 'time' and 'duration'
+        const duration = attrs.time || attrs.duration || 5;
 
         // Capitalize action name to match Lovense API requirements
         const capitalizedAction = action.charAt(0).toUpperCase() + action.slice(1).toLowerCase();
 
         const commandObj = {
             command: 'Function',
-            action: `${capitalizedAction}:${intensity}`,
-            timeSec: duration,
+            action: `${capitalizedAction}:${actionString}`,
+            timeSec: parseFloat(duration),
             apiVer: 1,
         };
+
+        // Add device targeting if specified
+        if (attrs.device) {
+            const deviceName = attrs.device.toLowerCase();
+            const toyId = findToyIdByName(deviceName);
+            if (toyId) {
+                commandObj.toy = toyId;
+            }
+        }
 
         // Parse optional loop parameters
         if (attrs.loop) {
@@ -252,6 +445,11 @@ function parseAICommands(text) {
             commandObj.loopPauseSec = parseFloat(attrs.pause);
         }
 
+        // Add stopPrevious parameter if specified (default is 1)
+        if (attrs.stopprevious !== undefined) {
+            commandObj.stopPrevious = parseInt(attrs.stopprevious);
+        }
+
         commands.push(commandObj);
     }
 
@@ -259,69 +457,81 @@ function parseAICommands(text) {
 }
 
 /**
- * Start looping the last command
+ * Start looping all commands from the current message
  */
-function startLoopingLastCommand() {
-    console.log('[Lovense] startLoopingLastCommand called, lastCommand:', lastCommand);
+function startLoopingCommands() {
+    console.log('[Lovense] startLoopingCommands called, messageCommands:', messageCommands);
 
-    // Clear any existing scheduled loop
-    if (loopTimeout) {
-        clearTimeout(loopTimeout);
-        loopTimeout = null;
+    // Clear any existing loop
+    if (loopInterval) {
+        clearInterval(loopInterval);
+        loopInterval = null;
     }
 
-    if (!lastCommand) {
-        console.log('[Lovense] No last command to loop');
+    if (!messageCommands || messageCommands.length === 0) {
+        console.log('[Lovense] No commands to loop');
         return;
     }
 
-    // Don't loop stop commands
-    if (lastCommand.action === 'Stop') {
-        console.log('[Lovense] Last command is Stop, not looping');
+    // Filter out stop commands from the loop sequence
+    const loopableCommands = messageCommands.filter(cmd => cmd.action !== 'Stop').map(cmd => {
+        // Clone the command to avoid modifying the original
+        const clonedCmd = { ...cmd };
+        // Convert infinite loops (timeSec=0) to 30 seconds for sequential playback
+        if (clonedCmd.timeSec === 0) {
+            clonedCmd.timeSec = 30;
+        }
+        return clonedCmd;
+    });
+
+    if (loopableCommands.length === 0) {
+        console.log('[Lovense] No loopable commands (only stop commands)');
         return;
     }
 
-    // Don't loop if the command already has infinite duration
-    if (lastCommand.timeSec === 0) {
-        console.log('[Lovense] Last command already has infinite duration, not looping');
-        return;
-    }
+    console.log('[Lovense] Starting command loop with', loopableCommands.length, 'commands');
+    currentLoopIndex = 0;
+    isLooping = true;
 
-    console.log('[Lovense] Scheduling infinite loop for last command after', lastCommand.timeSec, 'seconds');
+    // Function to play next command in sequence
+    const playNextCommand = async () => {
+        if (!isLooping || loopableCommands.length === 0) return;
 
-    // Schedule the infinite loop to start AFTER the original command finishes
-    // Add a small buffer (500ms) to ensure the original command has completed
-    const delayMs = (lastCommand.timeSec * 1000) + 500;
+        const command = loopableCommands[currentLoopIndex];
+        console.log('[Lovense] Playing looped command', currentLoopIndex + 1, 'of', loopableCommands.length, ':', command);
 
-    loopTimeout = setTimeout(() => {
-        console.log('[Lovense] Starting infinite loop for command:', lastCommand);
+        await sendLovenseCommand(command, false, true);
 
-        // Create a looping version of the command that runs indefinitely
-        const loopCommand = { ...lastCommand };
+        // Check again after async operation
+        if (!isLooping) return;
 
-        // Set timeSec to 0 to loop indefinitely until stopped (per Lovense API docs)
-        loopCommand.timeSec = 0;
+        // Move to next command
+        currentLoopIndex = (currentLoopIndex + 1) % loopableCommands.length;
 
-        // Remove loop parameters when using infinite duration
-        // Having both timeSec=0 and loop parameters can cause conflicts
-        delete loopCommand.loopRunningSec;
-        delete loopCommand.loopPauseSec;
+        // Schedule the next command based on current command's duration
+        const currentDuration = (command.timeSec || 5) * 1000;
+        loopInterval = setTimeout(playNextCommand, currentDuration);
+    };
 
-        // Send the command to start looping indefinitely
-        sendLovenseCommand(loopCommand, false);
-    }, delayMs);
+    // Play the first command immediately
+    playNextCommand();
 }
 
 /**
- * Stop looping the last command
+ * Stop looping commands
  */
-function stopLoopingLastCommand() {
-    // Clear any scheduled loop
-    if (loopTimeout) {
-        clearTimeout(loopTimeout);
-        loopTimeout = null;
-        console.log('[Lovense] Cleared scheduled loop');
+function stopLoopingCommands() {
+    // Set flag to stop loop
+    isLooping = false;
+
+    // Clear any loop interval/timeout
+    if (loopInterval) {
+        clearTimeout(loopInterval);
+        loopInterval = null;
+        console.log('[Lovense] Cleared command loop');
     }
+
+    currentLoopIndex = 0;
 
     const settings = extension_settings[MODULE_NAME];
 
@@ -329,7 +539,7 @@ function stopLoopingLastCommand() {
         return;
     }
 
-    // Send a stop command to halt any infinite looping (silently to avoid error spam)
+    // Send a stop command to halt any activity (silently to avoid error spam)
     sendLovenseCommand({
         command: 'Function',
         action: 'Stop',
@@ -337,35 +547,40 @@ function stopLoopingLastCommand() {
         apiVer: 1,
     }, false, true);
 
-    console.log('[Lovense] Stopped looping last command');
+    console.log('[Lovense] Stopped looping commands');
 }
 
 /**
  * Handle streaming token received event
  * Executes commands in real-time as they appear during streaming
  */
-async function onStreamTokenReceived(text) {
+async function onStreamTokenReceived(data) {
     const settings = extension_settings[MODULE_NAME];
 
     if (!settings.enabled || !settings.connected) {
         return;
     }
 
-    // Parse all commands in the current text
-    const commands = parseAICommands(text);
+    // Accumulate the streaming text
+    const token = typeof data === 'string' ? data : (data?.text || data?.message || '');
+    if (!token) {
+        return;
+    }
 
-    // Execute only new commands that haven't been executed yet
+    streamingText += token;
+
+    // Parse all commands in the accumulated text
+    const commands = parseAICommands(streamingText);
+
+    // Execute commands in real-time as they appear during streaming
     for (const command of commands) {
         const commandKey = JSON.stringify(command);
 
         if (!executedCommands.has(commandKey)) {
             console.log('[Lovense] Executing command during streaming:', JSON.stringify(command));
-            // Stop looping when a new command comes in
-            stopLoopingLastCommand();
             executedCommands.add(commandKey);
+            messageCommands.push(command); // Add to message commands for looping later
             await sendLovenseCommand(command);
-        } else {
-            console.log('[Lovense] Skipping duplicate command:', JSON.stringify(command));
         }
     }
 }
@@ -374,12 +589,15 @@ async function onStreamTokenReceived(text) {
  * Handle AI message received event
  * This serves as a fallback for when streaming is not enabled
  */
-async function onMessageReceived(messageId) {
+async function onMessageReceived(data) {
     const settings = extension_settings[MODULE_NAME];
 
     if (!settings.enabled || !settings.connected) {
         return;
     }
+
+    // Handle both messageId (number) and event object formats
+    const messageId = typeof data === 'number' ? data : data?.index;
 
     const context = SillyTavern.getContext();
     const message = context.chat[messageId];
@@ -397,23 +615,18 @@ async function onMessageReceived(messageId) {
 
     console.log('[Lovense] Detected commands in AI message:', commands);
 
-    // Execute commands (this handles the non-streaming case)
-    for (const command of commands) {
-        const commandKey = JSON.stringify(command);
+    // Stop any existing loop
+    stopLoopingCommands();
 
-        if (!executedCommands.has(commandKey)) {
-            // Stop looping when a new command comes in
-            stopLoopingLastCommand();
-            executedCommands.add(commandKey);
-            await sendLovenseCommand(command);
-        }
-    }
-
-    // Clear the executed commands set for the next message
+    // Clear previous message commands and executed commands
+    messageCommands = [];
     executedCommands.clear();
 
-    // Start looping the last command after all commands are executed
-    startLoopingLastCommand();
+    // Store commands for looping (don't execute them immediately)
+    messageCommands = commands;
+
+    // Start looping all commands from this message
+    startLoopingCommands();
 }
 
 /**
@@ -421,17 +634,135 @@ async function onMessageReceived(messageId) {
  */
 function onGenerationStarted() {
     executedCommands.clear();
-    // Stop any looping when new generation starts
-    stopLoopingLastCommand();
+    messageCommands = []; // Clear commands from previous message
+    streamingText = ''; // Clear streaming text accumulator
+    // DON'T stop looping here - it will be stopped when new commands come in
+    // Stopping here causes issues with swipe regeneration events
+    console.log('[Lovense] Generation started - cleared state');
 }
 
 /**
  * Handle generation ended event to start looping
  */
 function onGenerationEnded() {
-    console.log('[Lovense] Generation ended, last command:', lastCommand);
-    // Start looping the last command when streaming ends
-    startLoopingLastCommand();
+    console.log('[Lovense] Generation ended -', messageCommands.length, 'commands detected');
+    // Clear streaming text accumulator
+    streamingText = '';
+    // Stop any existing loop before starting a new one
+    stopLoopingCommands();
+    // Start looping all commands from the message when streaming ends
+    startLoopingCommands();
+}
+
+/**
+ * Generate dynamic prompt based on connected toys
+ */
+function generateDynamicPrompt() {
+    if (!connectedToys || Object.keys(connectedToys).length === 0) {
+        return '';
+    }
+
+    const settings = extension_settings[MODULE_NAME];
+
+    // Collect all unique capabilities from connected toys
+    const capabilities = new Set(['vibrate']); // All toys can vibrate
+    const toyNames = [];
+    const toyDetails = [];
+
+    for (const toy of Object.values(connectedToys)) {
+        const toyName = (toy.name || '').toLowerCase();
+        const displayName = toy.name || 'Unknown';
+        toyNames.push(displayName);
+
+        // Collect device details
+        const toyCaps = TOY_CAPABILITIES[toyName] || ['vibrate'];
+        toyDetails.push({
+            name: displayName,
+            capabilities: toyCaps
+        });
+
+        toyCaps.forEach(cap => capabilities.add(cap));
+    }
+
+    // Build capabilities section
+    const capabilityDescriptions = {
+        'vibrate': '• Vibrate (0-20): ALL devices',
+        'rotate': '• Rotate (0-20): Nora, Diamo, Ridge',
+        'pump': '• Pump (0-3): Max, Max 2',
+        'thrusting': '• Thrusting (0-20): Sex Machine, Mini Sex Machine, Gravity',
+        'fingering': '• Fingering (0-20): Flexer',
+        'suction': '• Suction (0-20): Tenera, Tenera 2',
+        'depth': '• Depth (0-3): Automatically corresponds to vibrate',
+        'oscillate': '• Oscillate (0-20): Osci series',
+    };
+
+    const capabilitiesText = Array.from(capabilities)
+        .map(cap => capabilityDescriptions[cap])
+        .filter(Boolean)
+        .join('\n');
+
+    // Build available commands section
+    const commandDescriptions = {
+        'vibrate': '<lovense:vibrate="X" time="Y"/> - Vibrate at X (0-20) for Y seconds',
+        'rotate': '<lovense:rotate="X" time="Y"/> - Rotate at X (0-20) for Y seconds',
+        'pump': '<lovense:pump="X" time="Y"/> - Pump at X (0-3) for Y seconds',
+        'thrusting': '<lovense:thrusting="X" time="Y"/> - Thrust at X (0-20) for Y seconds',
+        'fingering': '<lovense:fingering="X" time="Y"/> - Fingering at X (0-20) for Y seconds',
+        'suction': '<lovense:suction="X" time="Y"/> - Suction at X (0-20) for Y seconds',
+        'oscillate': '<lovense:oscillate="X" time="Y"/> - Oscillate at X (0-20) for Y seconds',
+    };
+
+    const commandsText = Array.from(capabilities)
+        .map(cap => commandDescriptions[cap])
+        .filter(Boolean)
+        .join('\n');
+
+    // Add special commands for thrusting devices
+    const hasThrusting = capabilities.has('thrusting');
+    const strokeCommand = hasThrusting ? '\n• Stroke (0-100): Used with Thrusting (requires 20+ point difference)' : '';
+    const strokeExample = hasThrusting ? '\n<lovense:thrusting="10" stroke="0-50" time="10"/> - Thrust at 10 with stroke range 0-50 for 10 seconds' : '';
+
+    // Build combo example with available capabilities
+    const comboAttrs = Array.from(capabilities).slice(0, 2).map(cap => `${cap}="10"`).join(' ');
+
+    const guidelines = settings.guidelines || defaultSettings.guidelines;
+
+    // Add device targeting section if multiple devices are connected
+    let deviceSection = '';
+    if (toyDetails.length > 1) {
+        deviceSection = `\n\nDevice Targeting:\nControl specific devices by adding device="name" parameter:\n`;
+        for (const toy of toyDetails) {
+            deviceSection += `• ${toy.name}: ${toy.capabilities.join(', ')}\n`;
+        }
+        deviceSection += `\nExample: <lovense:vibrate="10" time="5" device="${toyDetails[0].name}"/>\nOmit device parameter to control all devices simultaneously.`;
+    }
+
+    const prompt = `You can control the user's Lovense device during this conversation:
+<lovense>
+Connected devices: ${toyNames.join(', ')}
+
+Capabilities:
+${capabilitiesText}${strokeCommand}
+
+Commands (use self-closing XML-style tags):
+${commandsText}
+<lovense:all="X" time="Y"/> - Activate all functions at X (0-20) for Y seconds
+<lovense:preset name="NAME" time="Y"/> - Use preset (pulse, wave, fireworks, earthquake) for Y seconds
+<lovense:pattern strength="X;X;X" interval="MS" time="Y"/> - Custom pattern (semicolon-separated 0-20 values)
+<lovense:stop/> - Stop all activity
+
+Multiple functions: Combine in one command
+<lovense:${comboAttrs} time="10"/>${strokeExample}
+
+Parameters:
+loop="X" pause="Y" - Loop: X seconds on, Y seconds off
+stopprevious="0" - Stack with previous commands (default: stop previous)${deviceSection}
+
+Guidelines:
+${guidelines}
+</lovense>`;
+
+    return prompt;
 }
 
 /**
@@ -445,38 +776,8 @@ function updatePrompt() {
         return;
     }
 
-    // Build toy list for prompt with feature information
-    let toyList = 'None connected';
-    if (connectedToys && Object.keys(connectedToys).length > 0) {
-        toyList = Object.values(connectedToys)
-            .map(toy => {
-                const features = [];
+    const prompt = generateDynamicPrompt();
 
-                // Determine supported features based on toy name/type
-                // Most Lovense toys support vibration
-                features.push('vibrate');
-
-                // Rotating toys (Nora, Diamo)
-                if (toy.name && /nora|diamo/i.test(toy.name)) {
-                    features.push('rotate');
-                }
-
-                // Pumping toys (Max series)
-                if (toy.name && /max/i.test(toy.name)) {
-                    features.push('pump');
-                }
-
-                const featureStr = features.length > 0 ? ` - Supports: ${features.join(', ')}` : '';
-                return `${toy.name || 'Unknown'} (Battery: ${toy.battery || 'N/A'}%)${featureStr}`;
-            })
-            .join('\n');
-    }
-
-    // Replace placeholders in prompt template
-    const prompt = settings.prompt_template.replace(/\{\{toyList\}\}/g, toyList);
-
-    // Inject at depth 0 as a SYSTEM message (right before generation)
-    // This follows the same pattern as RPG Companion's "together" mode
     setExtensionPrompt(
         EXTENSION_PROMPT_TAG,
         prompt,
@@ -485,8 +786,6 @@ function updatePrompt() {
         false,
         extension_prompt_roles.SYSTEM
     );
-
-    console.log('[Lovense] Prompt injected at depth 0 as SYSTEM message');
 }
 
 /**
@@ -501,9 +800,9 @@ function loadSettings() {
 
     // Restore settings to UI
     $('#lovense_enabled').prop('checked', settings.enabled);
-    $('#lovense_prompt_template').val(settings.prompt_template || DEFAULT_PROMPT);
     $('#lovense_local_ip').val(settings.local_ip || '127-0-0-1.lovense.club');
     $('#lovense_local_port').val(settings.local_port || '30010');
+    $('#lovense_guidelines').val(settings.guidelines || defaultSettings.guidelines);
 
     // Restore connection state
     if (settings.connected && settings.toys) {
@@ -543,19 +842,20 @@ function setupUI() {
         saveSettingsDebounced();
     });
 
-    // Prompt settings
-    $('#lovense_prompt_template').on('input', function () {
-        extension_settings[MODULE_NAME].prompt_template = $(this).val();
+    // Guidelines textarea
+    $('#lovense_guidelines').on('input', function () {
+        extension_settings[MODULE_NAME].guidelines = $(this).val();
         saveSettingsDebounced();
         updatePrompt();
     });
 
-    $('#lovense_reset_prompt').on('click', function () {
-        $('#lovense_prompt_template').val(DEFAULT_PROMPT);
-        extension_settings[MODULE_NAME].prompt_template = DEFAULT_PROMPT;
+    // Reset guidelines button
+    $('#lovense_reset_guidelines').on('click', function () {
+        $('#lovense_guidelines').val(defaultSettings.guidelines);
+        extension_settings[MODULE_NAME].guidelines = defaultSettings.guidelines;
         saveSettingsDebounced();
         updatePrompt();
-        toastr.success('Prompt reset to default');
+        toastr.success('Guidelines reset to default');
     });
 
     // Connection
@@ -580,24 +880,25 @@ function setupUI() {
         toastr.info('Sent vibrate command (3 seconds at 50% intensity)');
     });
 
-    $('#lovense_test_pulse').on('click', async function () {
-        await sendLovenseCommand({
-            command: 'Preset',
-            name: 'pulse',
-            timeSec: 5,
-            apiVer: 1,
-        });
-        toastr.info('Sent pulse pattern (5 seconds)');
-    });
+    // Stop all devices button
+    $('#lovense_stop_all').on('click', async function () {
+        // Stop looping
+        stopLoopingCommands();
 
-    $('#lovense_test_stop').on('click', async function () {
+        // Clear all queued commands
+        messageCommands = [];
+        executedCommands.clear();
+        streamingText = '';
+
+        // Send stop command to all devices
         await sendLovenseCommand({
             command: 'Function',
             action: 'Stop',
             timeSec: 0,
             apiVer: 1,
         });
-        toastr.info('Sent stop command');
+
+        toastr.success('All devices stopped and queue cleared');
     });
 }
 

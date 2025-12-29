@@ -97,55 +97,51 @@
                     </div>
                 </div>
 
-                <!-- Prompt Settings -->
-                <div id="lovense_prompt_section" style="margin-top: 10px;">
-                    <h4 style="margin-top: 10px; margin-bottom: 5px;">AI Prompt Settings</h4>
+<!-- Guidelines Settings -->
+            <div id="lovense_guidelines_section" style="margin-top: 10px;">
+                <h4 style="margin-top: 10px; margin-bottom: 5px;">AI Guidelines</h4>
 
-                    <label for="lovense_prompt_template" style="margin-bottom: 3px;">
-                        <b>Prompt Template</b>
-                    </label>
-                    <textarea id="lovense_prompt_template" class="text_pole textarea_compact" rows="8" placeholder="Enter the instruction for the AI..."></textarea>
-                    <small class="notes">
-                        This instruction tells the AI how to control the Lovense device. Available placeholders: {{toyList}} for connected toys.
-                        <br><strong>Note:</strong> The prompt is injected at depth 0 as a system message.
-                    </small>
+                <label for="lovense_guidelines" style="margin-bottom: 3px;">
+                    <b>Guidelines for AI</b>
+                </label>
+                <textarea id="lovense_guidelines" class="text_pole textarea_compact" rows="4" placeholder="Enter guidelines for the AI..."></textarea>
+                <small class="notes">
+                    These guidelines tell the AI how to use the Lovense commands appropriately.
+                    <br><strong>Note:</strong> Changes are automatically included in the system prompt.
+                    <br><strong>Device Control:</strong> When multiple devices are connected, the AI can target specific devices using device="name" parameter, or control all devices at once (default).
+                </small>
 
-                    <button id="lovense_reset_prompt" class="menu_button" style="margin-top: 5px;">
-                        <i class="fa-solid fa-rotate-left"></i> Reset to Default Prompt
+                <button id="lovense_reset_guidelines" class="menu_button" style="margin-top: 5px;">
+                    <i class="fa-solid fa-rotate-left"></i> Reset to Default Guidelines
+                </button>
+            </div>
+
+            <!-- Test Controls -->
+            <div id="lovense_test_section" style="margin-top: 10px;">
+                <h4 style="margin-top: 10px; margin-bottom: 5px;">Device Controls</h4>
+                <small class="notes">Manually control your Lovense devices:</small>
+
+                <div id="lovense_test_controls" style="margin-top: 5px; display: flex; gap: 5px; flex-wrap: wrap;">
+                    <button id="lovense_test_vibrate" class="menu_button" disabled style="flex: 1; min-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <i class="fa-solid fa-bolt"></i> Test Vibrate
+                    </button>
+                    <button id="lovense_stop_all" class="menu_button" disabled style="flex: 1; min-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background-color: #d9534f; border-color: #d43f3a;">
+                        <i class="fa-solid fa-stop"></i> Stop All
                     </button>
                 </div>
-
-                <!-- Test Controls -->
-                <div id="lovense_test_section" style="margin-top: 10px;">
-                    <h4 style="margin-top: 10px; margin-bottom: 5px;">Test Controls</h4>
-                    <small class="notes">Test your Lovense device directly:</small>
-
-                    <div id="lovense_test_controls" style="margin-top: 5px;">
-                        <button id="lovense_test_vibrate" class="menu_button" disabled>
-                            <i class="fa-solid fa-bolt"></i> Test Vibrate (50%)
-                        </button>
-                        <button id="lovense_test_pulse" class="menu_button" disabled>
-                            <i class="fa-solid fa-wave-square"></i> Test Pulse Pattern
-                        </button>
-                        <button id="lovense_test_stop" class="menu_button" disabled>
-                            <i class="fa-solid fa-stop"></i> Stop
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Support Links -->
-                <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
-                    <a href="https://www.lovense.com/a/SpicyMarinara" target="_blank" class="menu_button" style="flex: 1; text-align: center; text-decoration: none; min-width: 200px;">
-                        <i class="fa-solid fa-tag"></i> Buy Lovense 55% OFF
-                    </a>
-                    <a href="https://discord.com/invite/KdAkTg94ME" target="_blank" class="menu_button" style="flex: 1; text-align: center; text-decoration: none;">
-                        <i class="fa-brands fa-discord"></i> Discord
-                    </a>
-                    <a href="https://ko-fi.com/marinara_spaghetti" target="_blank" class="menu_button" style="flex: 1; text-align: center; text-decoration: none;">
-                        <i class="fa-solid fa-heart"></i> Support
-                    </a>
-                </div>
             </div>
+
+            <!-- Support Links -->
+            <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="https://www.lovense.com/a/SpicyMarinara" target="_blank" class="menu_button" style="flex: 1; text-align: center; text-decoration: none; min-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    <i class="fa-solid fa-tag"></i> Buy 55% OFF
+                </a>
+                <a href="https://discord.com/invite/KdAkTg94ME" target="_blank" class="menu_button" style="flex: 1; text-align: center; text-decoration: none; min-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    <i class="fa-brands fa-discord"></i> Discord
+                </a>
+                <a href="https://ko-fi.com/marinara_spaghetti" target="_blank" class="menu_button" style="flex: 1; text-align: center; text-decoration: none; min-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    <i class="fa-solid fa-heart"></i> Support
+                </a>
             </div>
         </div>
     </div>
