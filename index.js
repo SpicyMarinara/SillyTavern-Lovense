@@ -30,6 +30,10 @@ const TOY_CAPABILITIES = {
     'sex machine': ['vibrate', 'thrusting'],
     'mini sex machine': ['vibrate', 'thrusting'],
 
+    // Stroking toys (Solace) — thrusting speed + stroke length/depth
+    'solace': ['vibrate', 'thrusting'],
+    'solace pro': ['vibrate', 'thrusting'],
+
     // Fingering toys
     'flexer': ['vibrate', 'fingering'],
 
@@ -747,7 +751,7 @@ function generateDynamicPrompt() {
         'vibrate': '• Vibrate (0-20): ALL devices',
         'rotate': '• Rotate (0-20): Nora, Diamo, Ridge',
         'pump': '• Pump (0-3): Max, Max 2',
-        'thrusting': '• Thrusting (0-20): Sex Machine, Mini Sex Machine, Gravity',
+        'thrusting': '• Thrusting (0-20): Solace, Solace Pro, Sex Machine, Mini Sex Machine, Gravity',
         'fingering': '• Fingering (0-20): Flexer',
         'suction': '• Suction (0-20): Tenera, Tenera 2',
         'depth': '• Depth (0-3): Automatically corresponds to vibrate',
@@ -777,8 +781,8 @@ function generateDynamicPrompt() {
 
     // Add special commands for thrusting devices
     const hasThrusting = capabilities.has('thrusting');
-    const strokeCommand = hasThrusting ? '\n• Stroke (0-100): Used with Thrusting (requires 20+ point difference)' : '';
-    const strokeExample = hasThrusting ? '\n<lovense:thrusting="10" stroke="0-50" time="10"/> - Thrust at 10 with stroke range 0-50 for 10 seconds' : '';
+    const strokeCommand = hasThrusting ? '\n• Stroke "MIN-MAX" (each 0-100, gap >=20): stroke length & depth — narrow range = short/shallow strokes, wide range = long/deep strokes' : '';
+    const strokeExample = hasThrusting ? '\n<lovense:combo thrusting="10" stroke="20-90"/> - Speed 10 with long, deep strokes\n<lovense:combo thrusting="10" stroke="0-35"/> - Speed 10 with short, shallow strokes' : '';
 
     // Build combo example with available capabilities
     const comboAttrs = Array.from(capabilities).slice(0, 2).map(cap => `${cap}="10"`).join(' ');
@@ -809,8 +813,8 @@ ${commandsText}
 <lovense:pattern strength="X;X;X" interval="MS" time="Y"/> - Custom pattern (semicolon-separated 0-20 values)
 <lovense:stop/> - Stop all activity
 
-Multiple functions: Combine in one command
-<lovense:${comboAttrs} time="10"/>${strokeExample}
+Multiple functions: Combine in ONE command with the combo tag
+<lovense:combo ${comboAttrs} time="10"/>${strokeExample}
 
 Parameters:
 loop="X" pause="Y" - Loop: X seconds on, Y seconds off
